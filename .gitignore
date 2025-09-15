@@ -3,4 +3,5 @@
 __pycache__/
 config.py
 .Renviron
-
+publications2024.csv
+abstracts_inverted.json
