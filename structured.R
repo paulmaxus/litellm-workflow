@@ -1,5 +1,6 @@
+library(dplyr)
 library(httr2)
-library(readr)
+library(jsonlite)
 
 api_key <- Sys.getenv("OPENAI_API_KEY")
 base_url <- Sys.getenv("OPENAI_BASE_URL")
@@ -11,7 +12,31 @@ headers <- list(
 )
 
 # Load publications data
-data <- read_csv("publications2024.csv", n_max = 20)
+data <- read.csv("publications2024.csv", nrows = 20)
+
+# Read and invert abstracts
+n_subsets <- 20
+
+abstracts_inverted <- read_json("abstracts_inverted.json")
+
+abstracts <- list()
+for (item in abstracts_inverted[1:n_subsets]) {
+  if (is.null(item$abstract)) {
+    next
+  }
+  # Create list of placeholders with sufficiently large size
+  abstract <- rep(NA, 10000)
+  for (word in names(item$abstract)) {
+    indexes <- item$abstract[[word]]
+    for (index in indexes) {
+      abstract[index] <- word
+    }
+  }
+  abstract <- paste(abstract[!is.na(abstract)], collapse = " ")
+  abstracts <- append(abstracts, list(list(id = item$id, abstract = abstract)))
+}
+
+data <- merge(data, bind_rows(abstracts), by = "id")
 
 # Assign SDG labels
 model <- "gpt-4o-mini"
@@ -25,10 +50,13 @@ schema <- list(
     properties = list(
       sdg = list(type = "integer", minimum = 1, maximum = 17),
       label = list(type = "string")
-    )
+    ),
+    required = c("sdg", "label"),
+    additionalProperties = FALSE
   )
 )
 
+responses_titles <- list()
 for (text in data$title) {
   response <- request(paste0(base_url, "chat/completions")) %>%
     req_headers(!!!headers) %>%
@@ -49,8 +77,15 @@ for (text in data$title) {
 
   if (response$status_code == 200) {
     content <- resp_body_json(response)
-    print(content$choices[[1]]$message$content)
+    responses_titles <- append(
+      responses_titles,
+      list(fromJSON(content$choices[[1]]$message$content))
+    )
   } else {
     cat("Error:", response$status_code, "\n")
   }
 }
+
+data <- data %>% bind_cols(responses_titles %>% bind_rows())
+
+# We can do the same for abstracts
