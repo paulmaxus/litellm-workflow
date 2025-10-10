@@ -1,0 +1,4 @@
+post_id,post_text,virtue,vice,us.pos,them.neg,dehumanization,word.count
+1,"I think we are better than X, so much better",0,5,5,3,0,10
+2,"X is worse than a rat, disgusting",0,5,0,5,5,7
+3,"We will always be inferior to the great X",0,3,0,0,0,9
